@@ -16,10 +16,13 @@
  * along with SkyClaims.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.mohron.skyclaims.command.user;
+package net.mohron.skyclaims.command.team;
 
+import com.google.common.collect.Lists;
 import net.mohron.skyclaims.SkyClaims;
+import net.mohron.skyclaims.command.argument.Argument;
 import net.mohron.skyclaims.permissions.Permissions;
+import net.mohron.skyclaims.util.CommandUtil;
 import net.mohron.skyclaims.world.Island;
 import org.spongepowered.api.command.CommandException;
 import org.spongepowered.api.command.CommandResult;
@@ -28,45 +31,47 @@ import org.spongepowered.api.command.args.CommandContext;
 import org.spongepowered.api.command.spec.CommandExecutor;
 import org.spongepowered.api.command.spec.CommandSpec;
 import org.spongepowered.api.entity.living.player.Player;
+import org.spongepowered.api.service.pagination.PaginationList;
 import org.spongepowered.api.text.Text;
+import org.spongepowered.api.text.action.TextActions;
 import org.spongepowered.api.text.format.TextColors;
+import org.spongepowered.api.text.format.TextStyles;
 
-public class CommandSetSpawn implements CommandExecutor {
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
+
+public class CommandTeamInfo implements CommandExecutor {
 	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
-	public static final String HELP_TEXT = "set your spawn location for your island.";
+	public static final String HELP_TEXT = "display detailed information on a team.";
+	private static final Text TEAM = Text.of("team");
 
 	public static CommandSpec commandSpec = CommandSpec.builder()
-		.permission(Permissions.COMMAND_SET_SPAWN)
+		.permission(Permissions.COMMAND_INFO)
 		.description(Text.of(HELP_TEXT))
-		.executor(new CommandSetSpawn())
+		.arguments(Argument.island(TEAM))
+		.executor(new CommandTeamInfo())
 		.build();
 
 	public static void register() {
 		try {
 			PLUGIN.getGame().getCommandManager().register(PLUGIN, commandSpec);
-			PLUGIN.getLogger().debug("Registered command: CommandSetSpawn");
+			PLUGIN.getLogger().debug("Registered command: CommandTeamInfo");
 		} catch (UnsupportedOperationException e) {
 			e.printStackTrace();
-			PLUGIN.getLogger().error("Failed to register command: CommandSetSpawn");
+			PLUGIN.getLogger().error("Failed to register command: CommandTeamInfo");
 		}
 	}
 
 	public CommandResult execute(CommandSource src, CommandContext args) throws CommandException {
-		if (!(src instanceof Player))
-			throw new CommandException(Text.of("You must be a player to use this command!"));
+		List<Text> infoText = Lists.newArrayList();
 
-		Player player = (Player) src;
-		Island island = Island.get(player.getLocation())
-			.orElseThrow(() -> new CommandException(Text.of("You must be on an island to use this command!")));
-
-		if (!island.getOwnerUniqueId().equals(player.getUniqueId()) && !player.hasPermission(Permissions.COMMAND_SET_SPAWN_OTHERS))
-			throw new CommandException(Text.of("Only the island owner may use this command!"));
-
-		island.setSpawn(player.getTransform());
-		player.sendMessage(Text.of("Your island spawn has been set to ", TextColors.GRAY, "(",
-			TextColors.LIGHT_PURPLE, island.getSpawn().getPosition().getFloorX(), TextColors.GRAY, " ,",
-			TextColors.LIGHT_PURPLE, island.getSpawn().getPosition().getFloorY(), TextColors.GRAY, " ,",
-			TextColors.LIGHT_PURPLE, island.getSpawn().getPosition().getFloorZ(), TextColors.GRAY, ")"));
+		PaginationList.builder()
+			.title(Text.of(TextColors.AQUA, "Team Info"))
+			.padding(Text.of(TextColors.AQUA, TextStyles.STRIKETHROUGH, "-"))
+			.contents(infoText)
+			.sendTo(src);
 
 		return CommandResult.success();
 	}

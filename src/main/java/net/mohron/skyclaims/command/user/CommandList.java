@@ -70,7 +70,7 @@ public class CommandList implements CommandExecutor {
 	}
 
 	public CommandResult execute(CommandSource src, CommandContext args) throws CommandException {
-		if (SkyClaims.islands.isEmpty())
+		if (PLUGIN.getDataStore().getIslands().isEmpty())
 			src.sendMessage(Text.of(TextColors.RED, "There are currently no islands!"));
 		List<Text> listText = Lists.newArrayList();
 		Player player = (src instanceof Player) ? (Player) src : null;
@@ -79,8 +79,9 @@ public class CommandList implements CommandExecutor {
 
 		boolean spawnOthers = src.hasPermission(Permissions.COMMAND_SPAWN_OTHERS);
 
-		SkyClaims.islands.values().stream()
+		PLUGIN.getDataStore().getIslands().values().stream()
 			.filter(i -> user == null || i.hasPermissions(user))
+			.sorted(Comparator.comparing(Island::getSortableName))
 			.sorted(sortType)
 			.forEach(island -> listText.add(Text.of(
 				getLocked(island),

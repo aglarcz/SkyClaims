@@ -18,21 +18,17 @@
 
 package net.mohron.skyclaims;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 import me.ryanhamshire.griefprevention.GriefPrevention;
 import me.ryanhamshire.griefprevention.api.GriefPreventionApi;
 import net.mohron.skyclaims.command.CommandAdmin;
 import net.mohron.skyclaims.command.CommandIsland;
-import net.mohron.skyclaims.command.admin.CommandCreateSchematic;
-import net.mohron.skyclaims.command.admin.CommandDelete;
-import net.mohron.skyclaims.command.admin.CommandReload;
-import net.mohron.skyclaims.command.admin.CommandSetup;
-import net.mohron.skyclaims.command.admin.CommandTransfer;
-import net.mohron.skyclaims.command.user.*;
+import net.mohron.skyclaims.command.CommandTeam;
+import net.mohron.skyclaims.command.argument.SchematicArgument;
 import net.mohron.skyclaims.config.ConfigManager;
 import net.mohron.skyclaims.config.type.GlobalConfig;
+import net.mohron.skyclaims.data.DataStore;
+import net.mohron.skyclaims.data.UpdatePlayTimeTask;
 import net.mohron.skyclaims.database.IDatabase;
 import net.mohron.skyclaims.database.MysqlDatabase;
 import net.mohron.skyclaims.database.SqliteDatabase;
@@ -54,6 +50,7 @@ import org.spongepowered.api.config.DefaultConfig;
 import org.spongepowered.api.event.Listener;
 import org.spongepowered.api.event.Order;
 import org.spongepowered.api.event.cause.Cause;
+import org.spongepowered.api.event.game.GameReloadEvent;
 import org.spongepowered.api.event.game.state.GameAboutToStartServerEvent;
 import org.spongepowered.api.event.game.state.GamePostInitializationEvent;
 import org.spongepowered.api.event.game.state.GameStartedServerEvent;
@@ -64,9 +61,7 @@ import org.spongepowered.api.plugin.PluginContainer;
 import org.spongepowered.api.service.permission.PermissionService;
 
 import java.nio.file.Path;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static net.mohron.skyclaims.PluginInfo.*;
 
@@ -76,26 +71,21 @@ import static net.mohron.skyclaims.PluginInfo.*;
 	description = DESCRIPTION,
 	authors = AUTHORS,
 	dependencies = {
-		@Dependency(id = "griefprevention", version = "2.3.1"),
-		@Dependency(id = "nucleus", version = "0.24.0", optional = true)
+		@Dependency(id = "griefprevention", version = GP_VERSION),
+		@Dependency(id = "nucleus", version = NUCLEUS_VERSION, optional = true)
 	})
 public class SkyClaims {
 	private static SkyClaims instance;
 	private static GriefPreventionApi griefPrevention;
 	private static PermissionService permissionService;
 	private static Integration integration;
-	public static Map<UUID, Island> islands = Maps.newHashMap();
-	private static Set<Island> saveQueue = Sets.newHashSet();
 
 	@Inject
 	private PluginContainer pluginContainer;
-
 	@Inject
 	private Logger logger;
-
 	@Inject
 	private Game game;
-
 	@Inject
 	private Metrics metrics;
 
@@ -108,6 +98,7 @@ public class SkyClaims {
 	private ConfigManager pluginConfigManager;
 	private GlobalConfig defaultConfig;
 
+	private DataStore dataStore;
 	private IDatabase database;
 
 	private boolean enabled = true;
@@ -172,16 +163,15 @@ public class SkyClaims {
 	public void onServerStarted(GameStartedServerEvent event) {
 		if (!enabled) return;
 
+		dataStore = new DataStore();
 		database = initializeDatabase();
 
-		islands = database.loadData();
-		addCustomMetrics();
-		getLogger().info("Islands Loaded: " + islands.size());
+		dataStore.setIslands(database.loadData());
+		getLogger().info("Islands Loaded: " + dataStore.getIslands().size());
+		if (!dataStore.getSaveQueue().isEmpty()) dataStore.processSaveQueue();
 
-		if (!saveQueue.isEmpty()) {
-			getLogger().info("Saving " + saveQueue.size() + " claims that were malformed");
-			database.saveData(saveQueue);
-		}
+		createTasks();
+		addCustomMetrics();
 
 		getLogger().info("Initialization complete.");
 	}
@@ -192,26 +182,24 @@ public class SkyClaims {
 		getLogger().info(String.format("%S %S is stopping...", NAME, VERSION));
 	}
 
+	@Listener
+	public void onReload(GameReloadEvent event) {
+		reload();
+	}
+
+	public void reload() {
+		// Load Plugin Config
+		pluginConfigManager.load();
+		// Load Schematics Directory
+		SchematicArgument.load();
+		// Load Database
+		dataStore.setIslands(database.loadData());
+	}
+
 	private void registerCommands() {
 		CommandAdmin.register();
-		CommandCreate.register();
-		CommandCreateSchematic.register();
-		CommandExpand.register();
-		CommandHome.register();
-		CommandDelete.register();
-		CommandInfo.register();
 		CommandIsland.register();
-		CommandList.register();
-		CommandLock.register();
-		CommandReload.register();
-		CommandReset.register();
-		CommandSetBiome.register();
-		CommandSetHome.register();
-		CommandSetSpawn.register();
-		CommandSetup.register();
-		CommandSpawn.register();
-		CommandTransfer.register();
-		CommandUnlock.register();
+		CommandTeam.register();
 	}
 
 	private IDatabase initializeDatabase() {
@@ -225,11 +213,19 @@ public class SkyClaims {
 		}
 	}
 
+	private void createTasks() {
+		// Update online player's play time
+		Sponge.getScheduler().createTaskBuilder()
+			.delay(5, TimeUnit.MINUTES)
+			.execute(new UpdatePlayTimeTask())
+			.submit(this);
+	}
+
 	private void addCustomMetrics() {
 		metrics.addCustomChart(new Metrics.SingleLineChart("islands") {
 			@Override
 			public int getValue() {
-				return islands.size();
+				return dataStore.getIslands().size();
 			}
 		});
 		metrics.addCustomChart(new Metrics.SimplePie("sponge_version") {
@@ -282,19 +278,19 @@ public class SkyClaims {
 		this.defaultConfig = config;
 	}
 
-	public ConfigManager getConfigManager() {
-		return this.pluginConfigManager;
-	}
-
 	public Path getConfigDir() {
 		return configDir;
+	}
+
+	public DataStore getDataStore() {
+		return dataStore;
 	}
 
 	public IDatabase getDatabase() {
 		return database;
 	}
 
-	public void queueForSaving(Island island) {
-		saveQueue.add(island);
+	public void addToSaveQueue(Island island) {
+		dataStore.addToSaveQueue(island);
 	}
 }

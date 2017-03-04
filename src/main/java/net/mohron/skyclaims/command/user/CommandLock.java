@@ -41,7 +41,6 @@ import java.util.UUID;
 
 public class CommandLock implements CommandExecutor {
 	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
-
 	public static final String HELP_TEXT = "used to prevent untrusted players from visiting to your island.";
 	private static final Text ALL = Text.of("all");
 	private static final Text ISLAND = Text.of("island");
@@ -96,7 +95,7 @@ public class CommandLock implements CommandExecutor {
 	}
 
 	private CommandResult lockAll(CommandSource src) {
-		SkyClaims.islands.values().forEach(island -> island.setLocked(true));
+		PLUGIN.getDataStore().getIslands().values().forEach(island -> island.setLocked(true));
 		src.sendMessage(Text.of(TextColors.GREEN, "All islands have been locked!"));
 		return CommandResult.success();
 	}

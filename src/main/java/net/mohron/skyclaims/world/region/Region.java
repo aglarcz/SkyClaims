@@ -19,6 +19,7 @@
 package net.mohron.skyclaims.world.region;
 
 import net.mohron.skyclaims.SkyClaims;
+import net.mohron.skyclaims.data.DataStore;
 import net.mohron.skyclaims.world.Coordinate;
 import net.mohron.skyclaims.world.Island;
 import org.spongepowered.api.world.Location;
@@ -51,17 +52,18 @@ public class Region {
 
 	public Location<World> getCenter() {
 		return new Location<>(
-				SkyClaims.getInstance().getConfig().getWorldConfig().getWorld(),
-				(getGreaterBoundary().getX() + getLesserBoundary().getX()) / 2.0,
-				SkyClaims.getInstance().getConfig().getWorldConfig().getDefaultHeight(),
-				(getGreaterBoundary().getZ() + getLesserBoundary().getZ()) / 2.0
+			SkyClaims.getInstance().getConfig().getWorldConfig().getWorld(),
+			(getGreaterBoundary().getX() + getLesserBoundary().getX()) / 2.0,
+			SkyClaims.getInstance().getConfig().getWorldConfig().getDefaultHeight(),
+			(getGreaterBoundary().getZ() + getLesserBoundary().getZ()) / 2.0
 		);
 	}
 
 	public static boolean isOccupied(Region region) {
-		if (SkyClaims.islands.isEmpty()) return false;
+		DataStore dataStore = SkyClaims.getInstance().getDataStore();
+		if (dataStore.getIslands().isEmpty()) return false;
 
-		for (Island island : SkyClaims.islands.values()) {
+		for (Island island : dataStore.getIslands().values()) {
 			if (region.equals(island.getRegion()))
 				return true;
 		}

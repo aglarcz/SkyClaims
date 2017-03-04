@@ -16,16 +16,32 @@
  * along with SkyClaims.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package net.mohron.skyclaims;
+package net.mohron.skyclaims.team;
 
-public class PluginInfo {
-	public static final String ID = "skyclaims";
-	public static final String NAME = "@NAME@";
-	public static final String VERSION = "@VERSION@";
-	public static final String DESCRIPTION = "@DESCRIPTION@";
-	public static final String AUTHORS = "Mohron, Cossacksman";
-	public static final String GP_VERSION = "2.3.1";
-	public static final double GP_API_VERSION = 0.2;
-	public static final String NUCLEUS_VERSION = "0.24.1";
-	public static final double MCCLANS_API_VERSION = 1.5;
+import net.mohron.skyclaims.world.Island;
+import org.spongepowered.api.entity.living.player.User;
+import org.spongepowered.api.service.permission.Subject;
+import org.spongepowered.api.text.Text;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.UUID;
+
+public interface iTeam {
+
+	UUID getId();
+
+	TeamType getType();
+
+	Subject getSubject();
+
+	Text getName();
+
+	User getOwner();
+
+	List<User> getMembers();
+
+	List<Island> getIslands();
+
+	Duration getPlaytime();
 }

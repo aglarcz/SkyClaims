@@ -21,6 +21,7 @@ package net.mohron.skyclaims.command.argument;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import net.mohron.skyclaims.SkyClaims;
+import net.mohron.skyclaims.data.DataStore;
 import net.mohron.skyclaims.permissions.Permissions;
 import org.spongepowered.api.command.CommandSource;
 import org.spongepowered.api.command.args.ArgumentParseException;
@@ -39,6 +40,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class IslandArgument extends CommandElement {
+	private static DataStore dataStore = SkyClaims.getInstance().getDataStore();
+
 	public IslandArgument(@Nullable Text key) {
 		super(key);
 	}
@@ -47,18 +50,18 @@ public class IslandArgument extends CommandElement {
 	@Override
 	protected Object parseValue(CommandSource source, CommandArgs args) throws ArgumentParseException {
 		String arg = args.next().toLowerCase();
-		if (SkyClaims.islands.isEmpty())
+		if (dataStore.getIslands().isEmpty())
 			throw new ArgumentParseException(Text.of(TextColors.RED, "There are no valid island!"), arg, 0);
 		try {
 			UUID uuid = UUID.fromString(arg);
-			if (SkyClaims.islands.containsKey(uuid)) {
+			if (dataStore.getIslands().containsKey(uuid)) {
 				Set<UUID> islands = Sets.newHashSet();
 				islands.add(uuid);
 				return islands;
 			}
 		} catch (IllegalArgumentException ignored) {
 		}
-		return SkyClaims.islands.entrySet().stream()
+		return dataStore.getIslands().entrySet().stream()
 				.filter(i -> i.getValue().getOwnerName().equalsIgnoreCase(arg))
 				.map(Map.Entry::getKey)
 				.collect(Collectors.toSet());
@@ -69,7 +72,7 @@ public class IslandArgument extends CommandElement {
 		try {
 			String arg = args.peek().toLowerCase();
 			boolean admin = src.hasPermission(Permissions.COMMAND_LIST_ALL);
-			return SkyClaims.islands.entrySet().stream()
+			return dataStore.getIslands().entrySet().stream()
 					.filter(i -> i.getValue().getOwnerName().toLowerCase().startsWith(arg))
 					.filter(i -> admin || !(src instanceof Player) || i.getValue().hasPermissions((Player) src))
 					.map(m -> m.getValue().getOwnerName())

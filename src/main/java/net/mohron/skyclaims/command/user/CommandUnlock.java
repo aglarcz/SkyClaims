@@ -41,7 +41,6 @@ import java.util.UUID;
 
 public class CommandUnlock implements CommandExecutor {
 	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
-
 	public static final String HELP_TEXT = "used to allow untrusted players to visit your island.";
 	private static final Text ALL = Text.of("all");
 	private static final Text ISLAND = Text.of("island");
@@ -96,7 +95,7 @@ public class CommandUnlock implements CommandExecutor {
 	}
 
 	private CommandResult unlockAll(CommandSource src) {
-		SkyClaims.islands.values().forEach(island -> island.setLocked(false));
+		PLUGIN.getDataStore().getIslands().values().forEach(island -> island.setLocked(false));
 		src.sendMessage(Text.of(TextColors.GREEN, "All islands have been unlocked!"));
 		return CommandResult.success();
 	}

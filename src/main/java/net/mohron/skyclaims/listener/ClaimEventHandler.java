@@ -19,9 +19,11 @@
 package net.mohron.skyclaims.listener;
 
 import me.ryanhamshire.griefprevention.api.claim.Claim;
+import me.ryanhamshire.griefprevention.api.claim.TrustType;
 import me.ryanhamshire.griefprevention.api.event.CreateClaimEvent;
 import me.ryanhamshire.griefprevention.api.event.DeleteClaimEvent;
 import me.ryanhamshire.griefprevention.api.event.ResizeClaimEvent;
+import me.ryanhamshire.griefprevention.api.event.TrustClaimEvent;
 import net.mohron.skyclaims.SkyClaims;
 import net.mohron.skyclaims.world.Island;
 import org.spongepowered.api.entity.living.player.Player;
@@ -32,10 +34,15 @@ import org.spongepowered.api.text.action.TextActions;
 import org.spongepowered.api.text.format.TextColors;
 import org.spongepowered.api.world.World;
 
+import java.util.List;
+import java.util.UUID;
+
 public class ClaimEventHandler {
+	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
+
 	@Listener
 	public void onClaimCreate(CreateClaimEvent event, @Root Player player) {
-		World world = SkyClaims.getInstance().getConfig().getWorldConfig().getWorld();
+		World world = PLUGIN.getConfig().getWorldConfig().getWorld();
 		Claim claim = event.getClaim();
 		if (!claim.getWorld().equals(world) || !claim.isBasicClaim()) return;
 
@@ -45,7 +52,7 @@ public class ClaimEventHandler {
 
 	@Listener
 	public void onClaimDelete(DeleteClaimEvent event, @Root Player player) {
-		World world = SkyClaims.getInstance().getConfig().getWorldConfig().getWorld();
+		World world = PLUGIN.getConfig().getWorldConfig().getWorld();
 		for (Claim claim : event.getClaims()) {
 			if (claim.isBasicClaim() && claim.getWorld().equals(world)) {
 				if (event instanceof DeleteClaimEvent.Abandon)
@@ -65,11 +72,25 @@ public class ClaimEventHandler {
 
 	@Listener
 	public void onClaimResize(ResizeClaimEvent event, @Root Player player) {
-		World world = SkyClaims.getInstance().getConfig().getWorldConfig().getWorld();
+		World world = PLUGIN.getConfig().getWorldConfig().getWorld();
 		Claim claim = event.getClaim();
 		if (!claim.getWorld().equals(world) || !claim.isBasicClaim()) return;
 
 		event.setMessage(Text.of(TextColors.RED, "You cannot resize an island claim!"));
 		event.setCancelled(true);
+	}
+
+	@Listener
+	public void onClaimTrust(TrustClaimEvent.Add event, @Root Player player) {
+		TrustType trustType = event.getTrustType();
+		List<UUID> users = event.getUsers();
+		event.setMessage(Text.of(player.getName(), " has added ", users.get(0), " from ", trustType.name()));
+	}
+
+	@Listener
+	public void onClaimTrust(TrustClaimEvent.Remove event, @Root Player player) {
+		TrustType trustType = event.getTrustType();
+		List<UUID> users = event.getUsers();
+		event.setMessage(Text.of(player.getName(), " has attempted to remove ", users.get(0), " from ", trustType.name()));
 	}
 }

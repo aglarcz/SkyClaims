@@ -27,6 +27,7 @@ import me.ryanhamshire.griefprevention.api.claim.ClaimResult;
 import me.ryanhamshire.griefprevention.api.claim.ClaimResultType;
 import me.ryanhamshire.griefprevention.api.claim.TrustType;
 import net.mohron.skyclaims.SkyClaims;
+import net.mohron.skyclaims.data.DataStore;
 import net.mohron.skyclaims.exception.CreateIslandException;
 import net.mohron.skyclaims.exception.InvalidRegionException;
 import net.mohron.skyclaims.permissions.Options;
@@ -52,9 +53,8 @@ import java.util.stream.Collectors;
 
 public class Island {
 	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
-	private static final World WORLD = PLUGIN.getConfig().getWorldConfig().getWorld();
-	private static final ClaimManager CLAIM_MANAGER = PLUGIN.getGriefPrevention().getClaimManager(WORLD);
 	private static final IRegionPattern PATTERN = new SpiralRegionPattern();
+	private static DataStore dataStore = PLUGIN.getDataStore();
 
 	private UUID id;
 	private UUID owner;
@@ -94,14 +94,15 @@ public class Island {
 	public Island(UUID id, UUID owner, UUID claimId, Vector3d spawnLocation, boolean locked) {
 		this.id = id;
 		this.owner = owner;
-		this.spawn = new Transform<>(WORLD, spawnLocation);
+		this.spawn = new Transform<>(PLUGIN.getConfig().getWorldConfig().getWorld(), spawnLocation);
 		this.locked = locked;
 		this.claim = claimId;
 
-		Claim claim = CLAIM_MANAGER.getClaimByUUID(claimId).orElse(null);
+		ClaimManager claimManager = PLUGIN.getGriefPrevention().getClaimManager(spawn.getExtent());
+		Claim claim = claimManager.getClaimByUUID(claimId).orElse(null);
 		if (claim != null) {
 			this.claim = claimId;
-			int initialWidth = Options.getIntOption(owner, Options.INITIAL_SIZE, 8, 256) * 2;
+			int initialWidth = Options.getMinSize(owner) * 2;
 			// Resize claims smaller than the player's initial-size
 			if (claim.getWidth() < initialWidth)
 				setWidth(initialWidth);
@@ -111,7 +112,7 @@ public class Island {
 		} else {
 			try {
 				this.claim = ClaimUtil.createIslandClaim(owner, getRegion()).getUniqueId();
-				PLUGIN.queueForSaving(this);
+				PLUGIN.addToSaveQueue(this);
 			} catch (CreateIslandException e) {
 				PLUGIN.getLogger().error("Failed to create a new claim for island " + id);
 			}
@@ -119,21 +120,21 @@ public class Island {
 	}
 
 	public static Optional<Island> get(UUID islandUniqueId) {
-		return SkyClaims.islands.entrySet().stream()
+		return dataStore.getIslands().entrySet().stream()
 			.filter(i -> i.getValue().getUniqueId().equals(islandUniqueId))
 			.map(Map.Entry::getValue)
 			.findFirst();
 	}
 
 	public static Optional<Island> get(Location<World> location) {
-		return SkyClaims.islands.entrySet().stream()
+		return dataStore.getIslands().entrySet().stream()
 			.filter(i -> i.getValue().contains(location))
 			.map(Map.Entry::getValue)
 			.findFirst();
 	}
 
 	public static Optional<Island> get(Claim claim) {
-		for (Island island : SkyClaims.islands.values()) {
+		for (Island island : dataStore.getIslands().values()) {
 			if (island.getClaim().isPresent() && island.getClaim().get().equals(claim)) return Optional.of(island);
 		}
 		return Optional.empty();
@@ -141,22 +142,22 @@ public class Island {
 
 	@Deprecated
 	public static Optional<Island> getByOwner(UUID owner) {
-		for (Island island : SkyClaims.islands.values()) {
+		for (Island island : dataStore.getIslands().values()) {
 			if (island.getOwnerUniqueId().equals(owner)) return Optional.of(island);
 		}
 		return Optional.empty();
 	}
 
 	public static boolean hasIsland(UUID owner) {
-		if (SkyClaims.islands.isEmpty()) return false;
-		for (Island island : SkyClaims.islands.values()) {
+		if (dataStore.getIslands().isEmpty()) return false;
+		for (Island island : dataStore.getIslands().values()) {
 			if (island.getOwnerUniqueId().equals(owner)) return true;
 		}
 		return false;
 	}
 
 	public static int getIslandsOwned(UUID owner) {
-		return (int) SkyClaims.islands.entrySet().stream()
+		return (int) dataStore.getIslands().entrySet().stream()
 			.filter(i -> i.getValue().getOwnerUniqueId().equals(owner))
 			.count();
 	}
@@ -192,7 +193,7 @@ public class Island {
 	}
 
 	public Optional<Claim> getClaim() {
-		return CLAIM_MANAGER.getClaimByUUID(this.claim);
+		return PLUGIN.getGriefPrevention().getClaimManager(getWorld()).getClaimByUUID(this.claim);
 	}
 
 	public Date getDateCreated() {
@@ -224,7 +225,7 @@ public class Island {
 	}
 
 	public World getWorld() {
-		return WORLD;
+		return PLUGIN.getConfig().getWorldConfig().getWorld();
 	}
 
 	public Transform<World> getSpawn() {
@@ -233,7 +234,7 @@ public class Island {
 
 	public void setSpawn(Transform<World> transform) {
 		if (contains(transform.getLocation())) {
-			Transform<World> spawn = new Transform<>(WORLD, transform.getPosition(), transform.getRotation());
+			Transform<World> spawn = new Transform<>(getWorld(), transform.getPosition(), transform.getRotation());
 			if (transform.getLocation().getY() < 0 || transform.getLocation().getY() > 256) {
 				spawn.setPosition(
 					new Vector3d(spawn.getLocation().getX(), PLUGIN.getConfig().getWorldConfig().getDefaultHeight(),
@@ -330,7 +331,7 @@ public class Island {
 	}
 
 	private void save() {
-		SkyClaims.islands.put(id, this);
+		dataStore.getIslands().put(id, this);
 		PLUGIN.getDatabase().saveIsland(this);
 	}
 
@@ -345,8 +346,9 @@ public class Island {
 	}
 
 	public void delete() {
-		getClaim().ifPresent(claim -> CLAIM_MANAGER.deleteClaim(claim, PLUGIN.getCause()));
-		SkyClaims.islands.remove(id);
+		ClaimManager claimManager = PLUGIN.getGriefPrevention().getClaimManager(getWorld());
+		getClaim().ifPresent(claim -> claimManager.deleteClaim(claim, PLUGIN.getCause()));
+		dataStore.getIslands().remove(id);
 		PLUGIN.getDatabase().removeIsland(this);
 	}
 }

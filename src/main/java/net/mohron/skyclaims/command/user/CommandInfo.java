@@ -45,9 +45,7 @@ import java.util.function.Consumer;
 
 public class CommandInfo implements CommandExecutor {
 	private static final SkyClaims PLUGIN = SkyClaims.getInstance();
-
 	public static final String HELP_TEXT = "display detailed information on your island";
-
 	private static final Text ISLAND = Text.of("island");
 
 	public static CommandSpec commandSpec = CommandSpec.builder()
@@ -142,9 +140,18 @@ public class CommandInfo implements CommandExecutor {
 			TextColors.WHITE, "[",
 			TextColors.GOLD, Text.builder("Delete")
 				.onClick(TextActions.executeCallback(consumer -> {
-					island.clear();
-					island.delete();
-					src.sendMessage(Text.of(island.getOwnerName(), "'s island has been deleted!"));
+					src.sendMessage(Text.of(
+						TextColors.GREEN, "Are you sure you want to delete ", TextColors.GOLD, island.getOwnerName(), TextColors.GREEN, "'s island?", Text.NEW_LINE,
+						TextColors.WHITE, "[",
+						Text.builder("YES").color(TextColors.GREEN).onClick(TextActions.executeCallback(s -> {
+							island.clear();
+							island.delete();
+							src.sendMessage(Text.of(island.getOwnerName(), "'s island has been deleted!"));
+						})),
+						TextColors.WHITE, "] [",
+						Text.builder("NO").color(TextColors.RED).onClick(TextActions.executeCallback(s -> s.sendMessage(Text.of("Island deletion canceled!")))),
+						TextColors.WHITE, "]"
+					));
 				}))
 				.onHover(TextActions.showText(Text.of("Click to delete this island!"))),
 			TextColors.WHITE, "] "
@@ -173,13 +180,13 @@ public class CommandInfo implements CommandExecutor {
 
 	private Text getLocked(Island island) {
 		return Text.of(TextColors.WHITE, " [",
-				Text.builder(island.isLocked() ? "L" : "U")
-					.color(island.isLocked() ? TextColors.RED : TextColors.GREEN)
-					.onHover(TextActions.showText(island.isLocked()
-						? Text.of(TextColors.RED, "LOCKED")
-						: Text.of(TextColors.GREEN, "UNLOCKED")
-					))
-					.onClick(TextActions.executeCallback(toggleLock(island))),
+			Text.builder(island.isLocked() ? "L" : "U")
+				.color(island.isLocked() ? TextColors.RED : TextColors.GREEN)
+				.onHover(TextActions.showText(island.isLocked()
+					? Text.of(TextColors.RED, "LOCKED")
+					: Text.of(TextColors.GREEN, "UNLOCKED")
+				))
+				.onClick(TextActions.executeCallback(toggleLock(island))),
 			TextColors.WHITE, "] ");
 	}
 
