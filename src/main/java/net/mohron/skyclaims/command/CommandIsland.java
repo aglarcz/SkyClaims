@@ -67,7 +67,7 @@ public class CommandIsland extends CommandBase {
 
 	public static void register() {
 		try {
-			Sponge.getCommandManager().register(PLUGIN, commandSpec, "skyclaims", "island", "is");
+			Sponge.getCommandManager().register(PLUGIN, commandSpec, "skyclaims", "land", "is");
 			PLUGIN.getLogger().debug("Registered command: CommandIsland");
 		} catch (UnsupportedOperationException e) {
 			e.printStackTrace();
